@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
+  <title>Tres en Raya</title>
+  <style>
+    :root {
+      --bg: #f4f1ec;
+      --card: #ffffff;
+      --ink: #2b2a33;
+      --muted: #8a8794;
+      --line: #e4ded5;
+      --soft: #f6f3ee;
+      --x: #ef6f6c;
+      --o: #3fa7a3;
+      --shadow: 0 24px 60px -28px rgba(70, 45, 20, .35);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16151b;
+        --card: #211f28;
+        --ink: #f1eff5;
+        --muted: #8f8c9b;
+        --line: #34323e;
+        --soft: #2a2832;
+        --x: #ff8581;
+        --o: #5cc9c4;
+        --shadow: 0 24px 60px -28px rgba(0, 0, 0, .7);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--x) 14%, transparent), transparent 45%),
+        radial-gradient(circle at 85% 90%, color-mix(in srgb, var(--o) 14%, transparent), transparent 45%),
+        var(--bg);
+      color: var(--ink);
+      font-family: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      cursor: default;
+    }
+
+    /* Franja superior para arrastrar la ventana (macOS usa barra de título oculta) */
+    .drag-bar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 36px;
+      -webkit-app-region: drag;
+    }
+    html.mac .drag-bar { display: block; }
+    html.mac body { padding-top: 44px; }
+
+    kbd {
+      font: inherit;
+      font-size: .75rem;
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+    }
+    .hint {
+      margin: -6px 0 0;
+      text-align: center;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    .app {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border-radius: 28px;
+      padding: 28px 24px 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    h1 .x { color: var(--x); }
+    h1 .o { color: var(--o); }
+
+    .modes {
+      display: inline-flex;
+      background: var(--soft);
+      border-radius: 999px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .modes button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 700;
+      font-size: .9rem;
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+    }
+    .modes button.active {
+      background: var(--card);
+      color: var(--ink);
+      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, .15);
+    }
+
+    .scores {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+    }
+    .score {
+      background: var(--soft);
+      border-radius: 16px;
+      padding: 10px 12px;
+      text-align: center;
+      border: 2px solid transparent;
+      transition: border-color .25s, transform .25s;
+    }
+    .score .label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .score .value {
+      display: inline-block;
+      font-size: 1.6rem;
+      font-weight: 800;
+    }
+    .score.x .value { color: var(--x); }
+    .score.o .value { color: var(--o); }
+    .score.draw { min-width: 84px; }
+    .score.x.active { border-color: var(--x); }
+    .score.o.active { border-color: var(--o); }
+    .value.bump { animation: bump .45s ease; }
+
+    .status {
+      margin: 0;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+      min-height: 1.5em;
+      color: var(--muted);
+    }
+    .status .x { color: var(--x); }
+    .status .o { color: var(--o); }
+
+    .board-wrap {
+      position: relative;
+      /* El tablero se encoge si la ventana es baja, para que todo quepa sin scroll */
+      width: clamp(200px, calc(100vh - 470px), 100%);
+      align-self: center;
+      aspect-ratio: 1;
+    }
+    html.mac .board-wrap { width: clamp(200px, calc(100vh - 500px), 100%); }
+    .grid-lines, .win-line {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .grid-lines line {
+      stroke: var(--line);
+      stroke-width: 5;
+      stroke-linecap: round;
+    }
+    .win-line line {
+      stroke: var(--ink);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 100;
+      opacity: 0;
+    }
+    .win-line.show line {
+      opacity: .85;
+      animation: draw .45s ease-out forwards;
+    }
+
+    .board {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+    }
+    .cell {
+      position: relative;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      outline: none;
+    }
+    .cell::before {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border-radius: 18px;
+      background: transparent;
+      transition: background .15s;
+    }
+    .board.turn-x .cell:not(.filled):hover::before { background: color-mix(in srgb, var(--x) 12%, transparent); }
+    .board.turn-o .cell:not(.filled):hover::before { background: color-mix(in srgb, var(--o) 12%, transparent); }
+    .cell:focus-visible::before { box-shadow: inset 0 0 0 3px var(--line); }
+    .board.locked .cell, .cell.filled { cursor: default; }
+    .board.locked .cell:hover::before { background: transparent !important; }
+
+    .cell svg {
+      position: relative;
+      width: 58%;
+      height: 58%;
+      overflow: visible;
+    }
+    .cell svg * {
+      fill: none;
+      stroke-width: 13;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 100;
+      animation: draw .3s ease-out forwards;
+    }
+    .cell.x svg * { stroke: var(--x); }
+    .cell.x svg path:nth-child(2) { animation-delay: .14s; }
+    .cell.o svg * { stroke: var(--o); }
+    .cell.o svg circle { transform: rotate(-90deg); transform-origin: 50% 50%; animation-duration: .4s; }
+    .cell.win svg { animation: pop .5s ease .35s; }
+    .board.done .cell:not(.win) svg { opacity: .35; transition: opacity .4s; }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+    .actions button {
+      flex: 1;
+      border: 0;
+      font: inherit;
+      font-weight: 800;
+      font-size: .95rem;
+      padding: 13px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform .12s, filter .2s, background .2s;
+    }
+    .actions button:active { transform: scale(.97); }
+    .primary {
+      background: var(--ink);
+      color: var(--card);
+    }
+    .primary:hover { filter: brightness(1.15); }
+    .primary.pulse { animation: pulse 1.6s ease-in-out infinite; }
+    .ghost {
+      background: var(--soft);
+      color: var(--muted);
+    }
+    .ghost:hover { color: var(--ink); }
+
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    @keyframes pop {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+    @keyframes bump {
+      0%, 100% { transform: scale(1); }
+      40% { transform: scale(1.35); }
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink) 35%, transparent); }
+      50% { box-shadow: 0 0 0 8px transparent; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="drag-bar" aria-hidden="true"></div>
+  <main class="app">
+    <header>
+      <h1>Tres en Raya <span class="x">×</span><span class="o">○</span></h1>
+      <div class="modes" role="group" aria-label="Modo de juego">
+        <button type="button" data-mode="pvp" class="active" aria-pressed="true">2 jugadores</button>
+        <button type="button" data-mode="cpu" aria-pressed="false">vs CPU</button>
+      </div>
+    </header>
+
+    <section class="scores" aria-label="Marcador">
+      <div class="score x" id="card-x"><span class="label" id="label-x">Jugador X</span><span class="value" id="score-x">0</span></div>
+      <div class="score draw"><span class="label">Empates</span><span class="value" id="score-draw">0</span></div>
+      <div class="score o" id="card-o"><span class="label" id="label-o">Jugador O</span><span class="value" id="score-o">0</span></div>
+    </section>
+
+    <p class="status" id="status" aria-live="polite"></p>
+
+    <div class="board-wrap">
+      <svg class="grid-lines" viewBox="0 0 300 300" aria-hidden="true">
+        <line x1="100" y1="14" x2="100" y2="286" />
+        <line x1="200" y1="14" x2="200" y2="286" />
+        <line x1="14" y1="100" x2="286" y2="100" />
+        <line x1="14" y1="200" x2="286" y2="200" />
+      </svg>
+      <div class="board" id="board" role="grid" aria-label="Tablero"></div>
+      <svg class="win-line" id="win-line" viewBox="0 0 300 300" aria-hidden="true">
+        <line id="win-stroke" pathLength="100" />
+      </svg>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="primary" id="new-round">Nueva partida</button>
+      <button type="button" class="ghost" id="reset-score">Reiniciar marcador</button>
+    </div>
+    <p class="hint">Teclas <kbd>1</kbd>–<kbd>9</kbd> para jugar · <kbd>N</kbd> nueva partida</p>
+  </main>
+
+  <script>
+    const LINES = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6],
+    ];
+    const MARKS = {
+      X: '<svg viewBox="0 0 100 100"><path pathLength="100" d="M22 22 L78 78"/><path pathLength="100" d="M78 22 L22 78"/></svg>',
+      O: '<svg viewBox="0 0 100 100"><circle pathLength="100" cx="50" cy="50" r="30"/></svg>',
+    };
+    const CPU_MISTAKE_RATE = 0.15; // probabilidad de que la CPU haga una jugada al azar
+
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const winLineEl = document.getElementById('win-line');
+    const winStroke = document.getElementById('win-stroke');
+    const newRoundBtn = document.getElementById('new-round');
+
+    const bridge = window.desktop; // expuesto por preload.js (no existe en el navegador)
+    if (bridge?.platform === 'darwin') document.documentElement.classList.add('mac');
+
+    const STORAGE_KEY = 'tres-en-raya';
+    function loadSaved() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+    }
+    function save() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: state.mode, scores: state.scores }));
+      } catch { /* sin almacenamiento: el juego sigue funcionando */ }
+    }
+    const saved = loadSaved();
+
+    const state = {
+      board: Array(9).fill(null),
+      turn: 'X',
+      starter: 'X',
+      mode: saved.mode === 'cpu' ? 'cpu' : 'pvp',
+      over: false,
+      scores: { X: 0, O: 0, draw: 0, ...saved.scores },
+      cpuTimer: null,
+    };
+
+    // Crear celdas
+    const cells = Array.from({ length: 9 }, (_, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cell';
+      btn.setAttribute('role', 'gridcell');
+      btn.setAttribute('aria-label', `Casilla ${i + 1}, vacía`);
+      btn.addEventListener('click', () => handleHumanMove(i));
+      boardEl.appendChild(btn);
+      return btn;
+    });
+
+    function getWinner(b) {
+      for (const line of LINES) {
+        const [a, c, d] = line;
+        if (b[a] && b[a] === b[c] && b[a] === b[d]) return { player: b[a], line };
+      }
+      return null;
+    }
+
+    const isCpuTurn = () => state.mode === 'cpu' && state.turn === 'O' && !state.over;
+
+    function handleHumanMove(i) {
+      if (state.over || state.board[i] || isCpuTurn()) return;
+      play(i);
+    }
+
+    function play(i) {
+      const player = state.turn;
+      state.board[i] = player;
+      const cell = cells[i];
+      cell.classList.add('filled', player.toLowerCase());
+      cell.innerHTML = MARKS[player];
+      cell.setAttribute('aria-label', `Casilla ${i + 1}, ${player}`);
+
+      const win = getWinner(state.board);
+      if (win) return finish(win);
+      if (state.board.every(Boolean)) return finish(null);
+
+      state.turn = player === 'X' ? 'O' : 'X';
+      render();
+      if (isCpuTurn()) scheduleCpu();
+    }
+
+    function finish(win) {
+      state.over = true;
+      if (win) {
+        state.scores[win.player]++;
+        bump(`score-${win.player.toLowerCase()}`);
+        win.line.forEach(i => cells[i].classList.add('win'));
+        drawWinLine(win.line);
+      } else {
+        state.scores.draw++;
+        bump('score-draw');
+      }
+      save();
+      render(win);
+    }
+
+    function drawWinLine([a, , c]) {
+      const center = i => ({ x: (i % 3) * 100 + 50, y: Math.floor(i / 3) * 100 + 50 });
+      const p1 = center(a), p2 = center(c);
+      // Alargar la línea un poco más allá de los centros
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy), ext = 32;
+      winStroke.setAttribute('x1', p1.x - dx / len * ext);
+      winStroke.setAttribute('y1', p1.y - dy / len * ext);
+      winStroke.setAttribute('x2', p2.x + dx / len * ext);
+      winStroke.setAttribute('y2', p2.y + dy / len * ext);
+      winLineEl.classList.remove('show');
+      void winLineEl.getBoundingClientRect(); // reiniciar animación
+      winLineEl.classList.add('show');
+    }
+
+    function bump(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('bump');
+      void el.offsetWidth;
+      el.classList.add('bump');
+    }
+
+    // ---------- CPU (minimax) ----------
+    function minimax(b, player, depth) {
+      const win = getWinner(b);
+      if (win) return { score: win.player === 'O' ? 10 - depth : depth - 10 };
+      if (b.every(Boolean)) return { score: 0 };
+
+      let best = { score: player === 'O' ? -Infinity : Infinity, move: -1 };
+      for (let i = 0; i < 9; i++) {
+        if (b[i]) continue;
+        b[i] = player;
+        const { score } = minimax(b, player === 'O' ? 'X' : 'O', depth + 1);
+        b[i] = null;
+        if (player === 'O' ? score > best.score : score < best.score) best = { score, move: i };
+      }
+      return best;
+    }
+
+    function cpuMove() {
+      const empty = state.board.map((v, i) => (v ? null : i)).filter(i => i !== null);
+      if (Math.random() < CPU_MISTAKE_RATE || empty.length === 9) {
+        return empty[Math.floor(Math.random() * empty.length)];
+      }
+      return minimax([...state.board], 'O', 0).move;
+    }
+
+    function scheduleCpu() {
+      clearTimeout(state.cpuTimer);
+      state.cpuTimer = setTimeout(() => {
+        if (isCpuTurn()) play(cpuMove());
+      }, 550);
+    }
+
+    // ---------- Render ----------
+    function name(p) {
+      if (state.mode === 'cpu') return p === 'X' ? 'Tú' : 'La CPU';
+      return p;
+    }
+
+    function render(win) {
+      const t = state.turn;
+      boardEl.classList.toggle('turn-x', t === 'X' && !state.over);
+      boardEl.classList.toggle('turn-o', t === 'O' && !state.over);
+      boardEl.classList.toggle('locked', state.over || isCpuTurn());
+      boardEl.classList.toggle('done', state.over);
+
+      document.getElementById('card-x').classList.toggle('active', !state.over && t === 'X');
+      document.getElementById('card-o').classList.toggle('active', !state.over && t === 'O');
+
+      document.getElementById('label-x').textContent = state.mode === 'cpu' ? 'Tú (X)' : 'Jugador X';
+      document.getElementById('label-o').textContent = state.mode === 'cpu' ? 'CPU (O)' : 'Jugador O';
+      document.getElementById('score-x').textContent = state.scores.X;
+      document.getElementById('score-o').textContent = state.scores.O;
+      document.getElementById('score-draw').textContent = state.scores.draw;
+
+      let msg;
+      if (state.over && win) {
+        const cls = win.player.toLowerCase();
+        if (state.mode === 'cpu') {
+          msg = win.player === 'X' ? '<span class="x">¡Ganaste! 🎉</span>' : '<span class="o">La CPU gana esta vez</span>';
+        } else {
+          msg = `<span class="${cls}">¡Gana ${win.player}! 🎉</span>`;
+        }
+      } else if (state.over) {
+        msg = 'Empate 🤝';
+      } else if (isCpuTurn()) {
+        msg = '<span class="o">La CPU está pensando…</span>';
+      } else if (state.mode === 'cpu') {
+        msg = '<span class="x">Tu turno</span>';
+      } else {
+        msg = `Turno de <span class="${t.toLowerCase()}">${t}</span>`;
+      }
+      statusEl.innerHTML = msg;
+      newRoundBtn.classList.toggle('pulse', state.over);
+    }
+
+    function newRound({ alternate = true } = {}) {
+      clearTimeout(state.cpuTimer);
+      if (alternate) state.starter = state.starter === 'X' ? 'O' : 'X';
+      state.board.fill(null);
+      state.turn = state.starter;
+      state.over = false;
+      cells.forEach((c, i) => {
+        c.className = 'cell';
+        c.innerHTML = '';
+        c.setAttribute('aria-label', `Casilla ${i + 1}, vacía`);
+      });
+      winLineEl.classList.remove('show');
+      render();
+      if (isCpuTurn()) scheduleCpu();
+    }
+
+    function resetAll() {
+      state.scores = { X: 0, O: 0, draw: 0 };
+      state.starter = 'X';
+      save();
+      newRound({ alternate: false });
+    }
+
+    function syncModeButtons() {
+      document.querySelectorAll('.modes button').forEach(b => {
+        const on = b.dataset.mode === state.mode;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+      });
+    }
+
+    function setMode(mode) {
+      if (mode === state.mode) return;
+      state.mode = mode;
+      syncModeButtons();
+      resetAll();
+    }
+
+    // ---------- Eventos ----------
+    newRoundBtn.addEventListener('click', () => newRound());
+    document.getElementById('reset-score').addEventListener('click', resetAll);
+    document.querySelectorAll('.modes button').forEach(btn => {
+      btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+
+    // Teclado: 1–9 colocan ficha (de izquierda a derecha, de arriba abajo), N = nueva partida
+    document.addEventListener('keydown', e => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= 9) {
+        handleHumanMove(n - 1);
+        cells[n - 1].focus({ preventScroll: true });
+      } else if (e.key === 'n' || e.key === 'N') {
+        newRound();
+      }
+    });
+
+    // Comandos del menú nativo de la app de escritorio
+    bridge?.onCommand(cmd => {
+      if (cmd === 'new-round') newRound();
+      else if (cmd === 'reset-score') resetAll();
+      else if (cmd === 'mode:pvp') setMode('pvp');
+      else if (cmd === 'mode:cpu') setMode('cpu');
+    });
+
+    syncModeButtons();
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "name": "tres-en-raya",
+  "productName": "Tres en Raya",
+  "version": "1.0.0",
+  "description": "El clásico 3 en raya para escritorio, con modo 2 jugadores y contra la CPU.",
+  "main": "main.js",
+  "private": true,
+  "author": "Tres en Raya",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/make-icon.mjs",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.jueguito.tresenraya",
+    "productName": "Tres en Raya",
+    "copyright": "© 2026",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.board-games",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Tres en Raya"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Tres en Raya",
+      "artifactName": "Tres-en-Raya-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Tres-en-Raya-Portable-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0",
+    "sharp": "0.35.5"
+  }
+}
